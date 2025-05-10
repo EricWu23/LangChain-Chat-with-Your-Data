@@ -12,7 +12,7 @@
 # This is useful if we want to ask question about specific documents (e.g., our PDFs, a set of videos, etc).
 
 # %%
-! pip install langchain
+#! pip install langchain
 
 # %%
 ! pip install openai
@@ -39,7 +39,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 ! pip install pypdf 
 
 # %%
-! pip install -U langchain-community
+#! pip install -U langchain-community
 
 # %%
 from langchain.document_loaders import PyPDFLoader
@@ -82,20 +82,21 @@ page.metadata
 from langchain_community.document_loaders import YoutubeLoader
 
 # %%
-!pip install --upgrade --quiet  youtube-transcript-api
+#!pip install --upgrade --quiet  youtube-transcript-api
 
 # %%
-!pip install --upgrade --quiet  pytube
+#!pip install --upgrade --quiet  pytube
 
 # %%
-!pip install --upgrade --quiet yt-dlp
+#!pip install --upgrade --quiet yt-dlp
 
 # %%
 # Initialize the loader with desired parameters
 loader = YoutubeLoader.from_youtube_url(
-    "https://www.youtube.com/watch?v=jGwO_UgTS7I",  # Replace with your video's URL
+    #"https://www.youtube.com/watch?v=jGwO_UgTS7I",  # Replace with your video's URL
+    "https://www.youtube.com/watch?v=x8FASlLf5ls",
     add_video_info=False,                         # Set to True to fetch video metadata
-    language=["en"],                             # Specify transcript language(s)
+    language=["zh", "en"],                             # Specify transcript language(s)
     translation="en"                             # Translate transcript if necessary
 )
 
@@ -103,7 +104,7 @@ loader = YoutubeLoader.from_youtube_url(
 docs=loader.load()
 
 # %%
-docs[0].page_content
+docs
 
 # %%
 docs[0].metadata
@@ -138,6 +139,7 @@ def fetch_youtube_metadata(url: str):
 
 # %%
 url = "https://www.youtube.com/watch?v=jGwO_UgTS7I"
+#url = "https://www.youtube.com/watch?v=x8FASlLf5ls"
 metadata = fetch_youtube_metadata(url)
 print(metadata)
 
@@ -149,6 +151,118 @@ docs[0].metadata = metadata.copy()
 
 # %%
 docs[0].metadata 
+
+# %%
+#!pip install --upgrade langchain langchain-community
+
+# %%
+from langchain_community.document_loaders.blob_loaders.youtube_audio import (
+    YoutubeAudioLoader,
+)
+from langchain_community.document_loaders.generic import GenericLoader
+from langchain_community.document_loaders.parsers.audio import (
+    OpenAIWhisperParser,
+    OpenAIWhisperParserLocal,
+)
+
+# %%
+#%pip install --upgrade --quiet  yt_dlp
+#%pip install --upgrade --quiet  pydub
+#%pip install --upgrade --quiet  librosa
+
+# %%
+#!pip install --upgrade transformers
+
+# %%
+#!pip install torch
+
+# %%
+#!pip install ipywidgets --upgrade --quiet
+
+# %%
+import os
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
+# %%
+# Two Karpathy lecture videos
+urls = ["https://www.youtube.com/watch?v=jGwO_UgTS7I"]
+# Directory to save audio files
+save_dir = "docs/youtube/"
+
+# %%
+# set a flag to switch between local and remote parsing
+# change this to True if you want to use local parsing
+local = True
+
+# %%
+# Transcribe the videos to text
+if local:
+    loader = GenericLoader(
+        YoutubeAudioLoader(urls, save_dir), OpenAIWhisperParserLocal(language="en")
+    )
+else:
+    loader = GenericLoader(YoutubeAudioLoader(urls, save_dir), OpenAIWhisperParser(language="en"))
+docs = loader.load()
+
+# %%
+docs[0].page_content
+
+# %%
+docs[0].metadata
+
+# %%
+metadata| docs[0].metadata
+
+# %%
+import os
+from langchain_community.document_loaders.generic import GenericLoader
+from langchain_community.document_loaders.parsers.audio import (
+    OpenAIWhisperParser,
+    OpenAIWhisperParserLocal,
+)
+from langchain_community.document_loaders.blob_loaders import YoutubeAudioLoader
+
+# Optional: Suppress Hugging Face symlink warning on Windows
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
+def transcribe_youtube_videos(
+    urls: list[str],
+    save_dir: str = "docs/youtube",
+    local: bool = False,
+    language: str = "en"
+):
+    """
+    Downloads and transcribes YouTube videos using OpenAI Whisper.
+
+    Parameters:
+        urls (list[str]): List of YouTube video URLs.
+        save_dir (str): Directory to save downloaded audio.
+        local (bool): Whether to use the local Whisper model.
+        language (str): Language code (e.g., "en", "zh") or "auto" for detection.
+
+    Returns:
+        list[Document]: LangChain documents containing the transcribed text.
+    """
+    parser = (
+        OpenAIWhisperParserLocal()
+        if local
+        else OpenAIWhisperParser(language=language)
+    )
+
+    loader = GenericLoader(
+        YoutubeAudioLoader(urls, save_dir),
+        parser
+    )
+    return loader.load()
+
+# %%
+urls = ["https://www.youtube.com/watch?v=x8FASlLf5ls"]
+docs = transcribe_youtube_videos(urls, save_dir="docs/youtube/", local=True, language="en")#"en"
+
+print(docs[0].page_content[:300])  
+
+# %%
+docs[1].page_content
 
 # %% [markdown]
 # **Note**: This can take several minutes to complete.
