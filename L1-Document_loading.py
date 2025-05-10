@@ -12,13 +12,13 @@
 # This is useful if we want to ask question about specific documents (e.g., our PDFs, a set of videos, etc).
 
 # %%
-#! pip install langchain
+! pip install langchain
 
 # %%
-#! pip install openai
+! pip install openai
 
 # %%
-#! pip install python-dotenv
+! pip install python-dotenv
 
 # %%
 import os
@@ -36,10 +36,10 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 # %%
 # The course will show the pip installs you would need to install packages on your own machine.
 # These packages are already installed on this platform and should not be run again.
-# ! pip install pypdf 
+! pip install pypdf 
 
 # %%
-#! pip install -U langchain-community
+! pip install -U langchain-community
 
 # %%
 from langchain.document_loaders import PyPDFLoader
@@ -58,6 +58,18 @@ len(pages)
 page = pages[0]
 
 # %%
+
+
+# %%
+type(page)
+
+# %%
+type(page.page_content)
+
+# %%
+type(page.metadata)
+
+# %%
 print(page.page_content[0:200])
 
 # %%
@@ -67,54 +79,79 @@ page.metadata
 # ## YouTube
 
 # %%
-from langchain.document_loaders.generic import GenericLoader
-from langchain.document_loaders.parsers import OpenAIWhisperParser
-from langchain.document_loaders.blob_loaders.youtube_audio import YoutubeAudioLoader
+from langchain_community.document_loaders import YoutubeLoader
 
 # %%
-#! pip install yt_dlp
-#! pip install pydub
+!pip install --upgrade --quiet  youtube-transcript-api
 
 # %%
-#! pip install ffmpeg 
+!pip install --upgrade --quiet  pytube
 
 # %%
-#import yt_dlp
-## Set yt-dlp options globally, including the ffmpeg location
-#yt_dlp.utils.std_headers['ffmpeg_location'] = 'C:/ffmpeg/bin/ffmpeg.exe'
+!pip install --upgrade --quiet yt-dlp
+
+# %%
+# Initialize the loader with desired parameters
+loader = YoutubeLoader.from_youtube_url(
+    "https://www.youtube.com/watch?v=jGwO_UgTS7I",  # Replace with your video's URL
+    add_video_info=False,                         # Set to True to fetch video metadata
+    language=["en"],                             # Specify transcript language(s)
+    translation="en"                             # Translate transcript if necessary
+)
+
+# %%
+docs=loader.load()
+
+# %%
+docs[0].page_content
+
+# %%
+docs[0].metadata
 
 # %%
 import yt_dlp
-from langchain.document_loaders.generic import GenericLoader
-from langchain.document_loaders.parsers import OpenAIWhisperParser
-from langchain.document_loaders.blob_loaders.youtube_audio import YoutubeAudioLoader
 
-# Define yt-dlp options directly
-ydl_opts = {
-    'ffmpeg_location': 'C:/ffmpeg/bin/',  # Provide path to FFmpeg binary
-    'outtmpl': 'docs/youtube/%(id)s.%(ext)s',  # Save the file with YouTube ID as the filename
-    'quiet': True,  # Suppress unnecessary output for clarity
-    'format': 'bestaudio/best'  # Download the best audio quality
-}
+# %%
+def fetch_youtube_metadata(url: str):
+    ydl_opts = {
+        'quiet': True,
+        'skip_download': True,  # Don't download the video
+        'extract_flat': False,  # Extract full metadata
+    }
 
-# Initialize yt-dlp with the options
-ydl = yt_dlp.YoutubeDL(ydl_opts)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        return {
+            "title": info.get("title"),
+            "description": info.get("description"),
+            "upload_date": info.get("upload_date"),
+            "duration": info.get("duration"),
+            "view_count": info.get("view_count"),
+            "like_count": info.get("like_count"),
+            "channel": info.get("uploader"),
+            "channel_url": info.get("uploader_url"),
+            "tags": info.get("tags"),
+            "categories": info.get("categories"),
+            "thumbnail": info.get("thumbnail"),
+            "webpage_url": info.get("webpage_url"),
+        }
+
+# %%
+url = "https://www.youtube.com/watch?v=jGwO_UgTS7I"
+metadata = fetch_youtube_metadata(url)
+print(metadata)
+
+# %%
+list(metadata.keys())
+
+# %%
+docs[0].metadata = metadata.copy()
+
+# %%
+docs[0].metadata 
 
 # %% [markdown]
 # **Note**: This can take several minutes to complete.
-
-# %%
-import os
-url="https://www.youtube.com/watch?v=jGwO_UgTS7I"
-save_dir="docs/youtube/"
-loader = GenericLoader(
-    YoutubeAudioLoader([url], save_dir),
-    OpenAIWhisperParser()
-)
-docs = loader.load()
-
-# %%
-docs[0].page_content[0:500]
 
 # %% [markdown]
 # ## URLs
