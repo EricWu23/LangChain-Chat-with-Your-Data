@@ -262,7 +262,172 @@ docs = transcribe_youtube_videos(urls, save_dir="docs/youtube/", local=True, lan
 print(docs[0].page_content[:300])  
 
 # %%
+docs
+
+# %%
 docs[1].page_content
+
+# %%
+docs[1].metadata
+
+# %%
+url = "https://www.youtube.com/watch?v=x8FASlLf5ls"
+metadata = fetch_youtube_metadata(url)
+
+# %%
+metadata
+
+# %%
+docs[1].metadata.update(metadata)
+
+# %%
+docs[1].metadata
+
+# %%
+docs = load_youtube_document(
+    url="https://www.youtube.com/watch?v=x8FASlLf5ls",
+    save_dir="docs/youtube/",
+    local=True,
+    language="zh"
+)
+
+# %%
+!pip install langdetect
+
+# %%
+from langdetect import detect
+import re
+
+def detect_lang_from_text(text: str) -> str:
+    try:
+        lang = detect(text)
+        if lang == "zh-cn" or lang == "zh-tw":
+            return "zh"
+        return lang
+    except:
+        return "en"  # fallback
+
+# %%
+url="https://www.youtube.com/watch?v=bSKX_PPflsk"
+# Detect language from title + description
+metadata = fetch_youtube_metadata(url)
+combined_text = f"{metadata.get('title', '')} {metadata.get('description', '')}"
+detected_language = detect_lang_from_text(combined_text)
+
+# %%
+detected_language
+
+# %%
+from typing import List, Optional
+from langchain_core.documents import Document
+from langchain_community.document_loaders import YoutubeLoader
+from langchain_community.document_loaders.generic import GenericLoader
+from langchain_community.document_loaders.parsers.audio import (
+    OpenAIWhisperParser,
+    OpenAIWhisperParserLocal,
+)
+from langchain_community.document_loaders.blob_loaders import YoutubeAudioLoader
+import yt_dlp
+import os
+from langdetect import detect
+import re
+
+# Optional: Suppress Hugging Face symlink warning on Windows
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
+def fetch_youtube_metadata(url: str) -> dict:
+    ydl_opts = {
+        'quiet': True,
+        'skip_download': True,
+        'extract_flat': False,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        return {
+            "title": info.get("title"),
+            "description": info.get("description"),
+            "upload_date": info.get("upload_date"),
+            "duration": info.get("duration"),
+            "view_count": info.get("view_count"),
+            "like_count": info.get("like_count"),
+            "channel": info.get("uploader"),
+            "channel_url": info.get("uploader_url"),
+            "tags": info.get("tags"),
+            "categories": info.get("categories"),
+            "thumbnail": info.get("thumbnail"),
+            "webpage_url": info.get("webpage_url"),
+        }
+    
+def detect_lang_from_text(text: str) -> str:
+    try:
+        lang = detect(text)
+        if lang == "zh-cn" or lang == "zh-tw":
+            return "zh"
+        return lang
+    except:
+        return "en"  # fallback
+    
+def load_youtube_document(
+    url: str,
+    save_dir: str = "docs/youtube",
+    local: bool = True,
+    language: str = None
+) -> List[Document]:
+    """
+    Loads transcript from YouTube if available, otherwise transcribes from audio.
+    Returns enriched LangChain Document(s).
+    """
+    docs = []
+
+    # Enrich with metadata and detecting language if needed
+    metadata = fetch_youtube_metadata(url)
+    if language is None: # if no language specified, it will be detected based on meta info
+        print("[Language Detection] Language not specified, detecting...")
+        combined_text = f"{metadata.get('title', '')} {metadata.get('description', '')}"
+        language = detect_lang_from_text(combined_text)
+
+    # Try loading transcript
+    try:
+        loader = YoutubeLoader.from_youtube_url(
+            url,
+            add_video_info=False,
+            language=[language],
+            translation=language
+        )
+        docs = loader.load()
+    except Exception as e:
+        print(f"[Transcript Loader] Warning: {e}")
+
+    # If no transcript, fall back to Whisper transcription
+    if not docs:
+        print("[Fallback] No transcript found. Using Whisper transcription.")
+        parser = (
+            OpenAIWhisperParserLocal()
+            if local
+            else OpenAIWhisperParser(language=language)
+        )
+        audio_loader = GenericLoader(YoutubeAudioLoader([url], save_dir), parser)
+        docs = audio_loader.load()
+
+
+    for doc in docs:
+        doc.metadata.update(metadata)
+
+    return docs
+
+# %%
+docs=load_youtube_document(
+      url="https://www.youtube.com/watch?v=tkFDeadKz2I",
+      save_dir="docs/youtube",
+      local=True,
+      language=None) 
+
+# %%
+docs
+
+# %%
+docs[1].metadata
 
 # %% [markdown]
 # **Note**: This can take several minutes to complete.
